@@ -1,6 +1,6 @@
 import {rooms} from "../db/rooms";
 import {Room, UpdateRoomResponse} from "../types/room";
-import {getUserByName} from "./user";
+import {getUserByIndex} from "./user";
 
 export const createRoom = () => {
     const id = Date.now();
@@ -17,10 +17,14 @@ export const getRoom = (indexRoom: number) => {
     return roomData;
 }
 
-export const addUserToRoom = (indexRoom: number, userName: string) => {
+export const addUserToRoom = (indexRoom: number, indexUser: number) => {
     const roomData = getRoom(indexRoom);
 
-    rooms.set(indexRoom, { ...roomData, players: [...roomData.players, userName] });
+    if (roomData.players.some(index => index === indexUser)) {
+        return;
+    }
+
+    rooms.set(indexRoom, { ...roomData, players: [...roomData.players, indexUser] });
 }
 
 export const updateRooms = (): UpdateRoomResponse => {
@@ -28,8 +32,8 @@ export const updateRooms = (): UpdateRoomResponse => {
         type: 'update_room',
         data: [...rooms.values()].map((room: Room) => ({
             roomId: room.index,
-            roomUsers: room.players.map(userName => {
-                const user = getUserByName(userName);
+            roomUsers: room.players.map(indexUser => {
+                const user = getUserByIndex(indexUser);
                 return { name: user.name, index: user.index };
             })
         })).filter(room => room.roomUsers.length === 1)

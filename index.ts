@@ -1,9 +1,11 @@
 import { httpServer } from "./src/http_server";
 import {WebSocket, WebSocketServer} from "ws";
 import {RequestType, SocketMessage, SocketResponse} from "./src/types/api";
-import {getUserByIndex, registerUser, updateWinners} from "./src/controllers/user";
-import {addUserToRoom, createRoom, getRoom, removeRoom, updateRooms} from "./src/controllers/room";
-import {createGame} from "./src/controllers/game";
+import {registerUser, updateWinners} from "./src/services/user";
+import {addUserToRoom, createRoom, getRoom, removeRoom, updateRooms} from "./src/services/room";
+import { createGame } from "./src/services/game";
+import { attack, addShips } from "./src/controllers/game";
+import {randomAttack} from "./src/controllers/game";
 
 const HTTP_PORT = 8181;
 const WS_PORT = 3000;
@@ -26,6 +28,10 @@ After program work finished the program should end websocket work correctly - ч
 After each received command program should display the command and result - где отображать?
  */
 
+function getClientByUserId(userId: number): ExtWebSocket | undefined {
+    return [...(wss.clients as Set<ExtWebSocket>).values()].find(client => client.userId === userId);
+}
+
 let index = 1;
 
 wss.on('connection', function connection(ws: ExtWebSocket) {
@@ -45,53 +51,100 @@ wss.on('connection', function connection(ws: ExtWebSocket) {
         });
     }
 
+    function sendResponses(socketResponses: { id: number, responses: SocketResponse[] }[]) {
+        socketResponses.forEach(socketResponse => {
+            const client = getClientByUserId(socketResponse.id);
+
+            if (client?.readyState === WebSocket.OPEN) {
+                socketResponse.responses.forEach(res => {
+                    send(res, client);
+                });
+            }
+        });
+    }
+
     ws.on('message', function message(request) {
-        const { type, data: jsonData } = JSON.parse(request.toString()) as { type: RequestType, data: string, id: 0 };
-        const data = jsonData && JSON.parse(jsonData);
+        try {
+            const { type, data: jsonData } = JSON.parse(request.toString()) as { type: RequestType, data: string, id: 0 };
+            const data = jsonData && JSON.parse(jsonData);
 
-        const socketRequest: SocketMessage = { data, type };
+            const socketRequest: SocketMessage = { data, type };
 
-        // обернуть в try catch
-        switch (socketRequest.type) {
-            case 'reg': {
-                send(registerUser(socketRequest.data, ws.userId));
-                // updateRoom и winners должны отправляться всем игрокам
-                // как только зашел 1 из них
-                sendAll(updateRooms());
-                sendAll(updateWinners());
-                break;
-            }
-            case 'create_room': {
-                const indexRoom = createRoom();
-                addUserToRoom(indexRoom, getUserByIndex(ws.userId).name);
-                sendAll(updateRooms());
-                break;
-            }
-            case 'add_user_to_room': {
-                const { indexRoom } = socketRequest.data;
+            switch (socketRequest.type) {
+                case 'reg': {
+                    const responseRegister = registerUser(socketRequest.data, ws.userId)
+                    send(responseRegister);
 
-                addUserToRoom(indexRoom, getUserByIndex(ws.userId).name);
+                    if (responseRegister.data.index && responseRegister.data.index !== ws.userId) {
+                        ws.userId = responseRegister.data.index;
+                    }
 
-                const room = getRoom(indexRoom);
-
-                if(room.players.length === 2) {
-                    const gameRequests = createGame(indexRoom);
-                    removeRoom(indexRoom);
-
-                    (wss.clients as Set<ExtWebSocket>).forEach((client) => {
-                        const clientRequest = gameRequests.find(request => request.data.idPlayer === client.userId);
-
-                        if (client.readyState === WebSocket.OPEN && clientRequest) {
-                            send(clientRequest, client);
-                        }
-                    });
+                    sendAll(updateRooms());
+                    sendAll(updateWinners());
+                    break;
                 }
+                case 'create_room': {
+                    const indexRoom = createRoom();
+                    addUserToRoom(indexRoom, ws.userId);
+                    sendAll(updateRooms());
+                    break;
+                }
+                case 'add_user_to_room': {
+                    const { indexRoom } = socketRequest.data;
 
-                sendAll(updateRooms());
-                break;
+                    addUserToRoom(indexRoom, ws.userId);
+
+                    const room = getRoom(indexRoom);
+
+                    if(room.players.length === 2) {
+                        const gameRequests = createGame(indexRoom);
+                        removeRoom(indexRoom);
+
+                        gameRequests.forEach(request => {
+                            const client = getClientByUserId(request.data.idPlayer);
+
+                            if (client?.readyState === WebSocket.OPEN) {
+                                send(request, client);
+                            }
+                        });
+                    }
+
+                    sendAll(updateRooms());
+                    break;
+                }
+                case 'add_ships': {
+                    const socketResponses = addShips(socketRequest);
+
+                    if (socketResponses) {
+                        sendResponses(socketResponses);
+                    }
+
+                    break;
+                }
+                case 'attack': {
+                    const socketResponses = attack(socketRequest);
+
+                    if (socketResponses) {
+                        sendResponses(socketResponses);
+
+                    }
+                    break;
+                }
+                case 'randomAttack': {
+                    const socketResponses = randomAttack(socketRequest);
+
+                    if (socketResponses) {
+                        sendResponses(socketResponses);
+
+                    }
+
+                    break;
+                }
+                default:
+                    throw new Error('Unknown type');
             }
-            default:
-                throw new Error('Unknown type');
+        } catch (e) {
+            console.error(e);
         }
     });
 });

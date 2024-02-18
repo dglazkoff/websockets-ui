@@ -3,7 +3,7 @@ import {SocketRequest, SocketResponse} from "./api";
 
 export interface Room {
     index: number;
-    players: User['name'][];
+    players: User['index'][];
 }
 
 export interface CreateRoomRequest extends SocketRequest {

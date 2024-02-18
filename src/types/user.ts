@@ -22,7 +22,6 @@ export interface RegisterRequest extends SocketRequest {
 
 export interface RegisterResponse extends SocketResponse {
     type: 'reg',
-    // в каких случаях ошибки при регистрации??
     data: {
         name: string;
         index?: number;
