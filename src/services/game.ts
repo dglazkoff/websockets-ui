@@ -122,20 +122,19 @@ export function attack(gameId: number, indexPlayer: number, position: TilePositi
     };
 }
 
-export function finishGame(gameId: number, indexPlayer: number): Finish | void {
+export function isAllShipsKilled(gameId: number, indexPlayer: number): boolean {
     const game = getGame(gameId);
     const [player1, player2] = game.players;
     const opponentPlayer = indexPlayer === player1 ? player2! : player1!;
 
     const opponentShips = getPlayerShips(gameId, opponentPlayer);
 
-    const isAllShipsKilled = opponentShips.every(ship => ship.hp === 0);
+    return opponentShips.every(ship => ship.hp === 0);
+}
 
-    if (isAllShipsKilled) {
-        const user = getUserByIndex(indexPlayer);
-        users.set(indexPlayer, { ...user, wins: user.wins + 1 })
-        return { type: 'finish', data: { winPlayer: indexPlayer } }
-    }
+export function finishGame(indexPlayer: number): Finish {
+    const user = getUserByIndex(indexPlayer);
+    users.set(indexPlayer, { ...user, wins: user.wins + 1 });
 
-    return;
+    return { type: 'finish', data: { winPlayer: indexPlayer } }
 }

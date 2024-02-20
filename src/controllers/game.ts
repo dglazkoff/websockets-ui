@@ -1,15 +1,57 @@
-import {CreateGame} from "../types/game";
-import {getRoom} from "./room";
-import {getUserByName} from "./user";
+import {finishGame, getGame, getPlayersTurn, isAllShipsKilled, playersTurn, startGame} from "../services/game";
+import {AddShipRequest, AttackRandomRequest, AttackRequest} from "../types/game";
+import {attack as attackService, addShips as addShipsService} from "../services/game";
+import {getRandomArbitrary} from "../utils";
+import {updateWinners} from "../services/user";
 
-export function createGame(indexRoom: number): [CreateGame,CreateGame] {
-    const id = Date.now();
-    const room = getRoom(indexRoom);
+export function addShips(request: AddShipRequest) {
+    const { gameId, ships, indexPlayer } = request.data;
 
-    if (room.players.length !== 2) throw new Error('Room is not full');
+    addShipsService(gameId, ships, indexPlayer);
 
-    return [
-        { type: 'create_game', data: { idGame: id, idPlayer: getUserByName(room.players[0]!).index } },
-        { type: 'create_game', data: { idGame: id, idPlayer: getUserByName(room.players[1]!).index } },
-    ]
+    const gameResponses = startGame(gameId);
+
+    const turn = playersTurn(gameId);
+
+    return gameResponses?.map(gameRequest => {
+        return {
+            id: gameRequest.data.currentPlayerIndex,
+            responses: [gameRequest, turn],
+        }
+    })
+}
+
+
+export function attack(request: AttackRequest) {
+    const { gameId, indexPlayer, x, y } = request.data;
+    const game = getGame(gameId);
+
+
+    if (getPlayersTurn(gameId) !== indexPlayer) return;
+
+    const attackResponse = attackService(gameId, indexPlayer, { x, y });
+    const turn = playersTurn(gameId, indexPlayer, attackResponse.data.status);
+    const finish = isAllShipsKilled(gameId, indexPlayer) ? finishGame(indexPlayer) : undefined;
+
+    return game.players.map(playerId => {
+        return {
+            id: playerId,
+            responses: [attackResponse, ...(finish ? [finish, updateWinners()] : [turn])],
+        }
+    });
+}
+
+export function randomAttack(request: AttackRandomRequest) {
+    const x = Math.round(getRandomArbitrary(0, 9));
+    const y = Math.round(getRandomArbitrary(0, 9));
+
+    return attack({
+        type: 'attack',
+        data: {
+            gameId: request.data.gameId,
+            indexPlayer: request.data.indexPlayer,
+            x,
+            y,
+        }
+    });
 }

@@ -1,5 +1,8 @@
 import {RegisterRequest, RegisterResponse, UpdateWinners, User, Winner} from "../types/user";
 import {users} from "../db/users";
+import {games} from "../db/games";
+import {finishGame} from "./game";
+import {rooms} from "../db/rooms";
 
 export function getUserByName(name: string) {
     const user = [...users.values()].find(user => user.name === name);
@@ -60,4 +63,22 @@ function getWinners(): Winner[] {
 
 export function updateWinners(): UpdateWinners {
     return { type: 'update_winners', data: getWinners() };
+}
+
+export function userDisconnect(index: number) {
+    users.delete(index);
+    const userInGame = [...games.values()].find(game => game.players.indexOf(index) !== -1);
+    const userInRoom = [...rooms.values()].find((room) => room.players.indexOf(index) !== -1);
+
+    if (userInGame || userInRoom) {
+        const [player1, player2] = userInGame?.players ?? userInRoom!.players;
+        const opponentPlayer = index === player1 ? player2! : player1!;
+
+        return [{
+            id: opponentPlayer,
+            responses: [finishGame(opponentPlayer), updateWinners()]
+        }]
+    }
+
+    return;
 }
