@@ -37,7 +37,7 @@ export function attack(request: AttackRequest) {
 
     const attackResponse = attackService(gameId, indexPlayer, { x, y });
     const turn = playersTurn(gameId, indexPlayer, attackResponse.data.status);
-    const finish = isAllShipsKilled(gameId, indexPlayer) ? finishGame(indexPlayer) : undefined;
+    const finish = isAllShipsKilled(gameId, indexPlayer) ? finishGame(indexPlayer, gameId) : undefined;
 
     return game.players.map(playerId => {
         return {

@@ -3,6 +3,7 @@ import {users} from "../db/users";
 import {games} from "../db/games";
 import {finishGame} from "./game";
 import {rooms} from "../db/rooms";
+import {removeRoom} from "./room";
 
 export function getUserByName(name: string) {
     const user = [...users.values()].find(user => user.name === name);
@@ -66,7 +67,6 @@ export function updateWinners(): UpdateWinners {
 }
 
 export function userDisconnect(index: number) {
-    users.delete(index);
     const userInGame = [...games.values()].find(game => game.players.indexOf(index) !== -1);
     const userInRoom = [...rooms.values()].find((room) => room.players.indexOf(index) !== -1);
 
@@ -74,9 +74,13 @@ export function userDisconnect(index: number) {
         const [player1, player2] = userInGame?.players ?? userInRoom!.players;
         const opponentPlayer = index === player1 ? player2! : player1!;
 
+        if (userInRoom) {
+            removeRoom(userInRoom.index);
+        }
+
         return [{
             id: opponentPlayer,
-            responses: [finishGame(opponentPlayer), updateWinners()]
+            responses: [finishGame(opponentPlayer, userInGame?.gameId), updateWinners()]
         }]
     }
 

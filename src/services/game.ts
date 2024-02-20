@@ -137,9 +137,13 @@ export function isAllShipsKilled(gameId: number, indexPlayer: number): boolean {
     return opponentShips.every(ship => ship.hp === 0);
 }
 
-export function finishGame(indexPlayer: number): Finish {
+export function finishGame(indexPlayer: number, gameId?: number): Finish {
     const user = getUserByIndex(indexPlayer);
     users.set(indexPlayer, { ...user, wins: user.wins + 1 });
+
+    if (gameId) {
+        games.delete(gameId);
+    }
 
     return { type: 'finish', data: { winPlayer: indexPlayer } }
 }
