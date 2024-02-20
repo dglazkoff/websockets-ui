@@ -14,6 +14,11 @@ import {games} from "../db/games";
 import {users} from "../db/users";
 import {getUserByIndex} from "./user";
 import {getRandomArbitrary} from "../utils";
+import {BOT_ID, botShips} from "../botConstants";
+
+function isEmpty(value: unknown): value is null | undefined {
+    return value === undefined || value === null;
+}
 
 export function getGame(gameId: number) {
     const game = games.get(gameId);
@@ -78,7 +83,7 @@ export function playersTurn(gameId: number, indexPlayer?: number, turnStatus?: T
     const game = getGame(gameId);
     const [player1, player2] = game.players;
 
-    if (!turnStatus || !indexPlayer) {
+    if (!turnStatus || isEmpty(indexPlayer)) {
         game.playersTurn = Math.round(getRandomArbitrary(0, 1)) ? player1! : player2!;
     } else {
         const opponentPlayer = indexPlayer === player1 ? player2! : player1!;
@@ -86,7 +91,7 @@ export function playersTurn(gameId: number, indexPlayer?: number, turnStatus?: T
         game.playersTurn = turnStatus === 'miss' ? opponentPlayer : indexPlayer;
     }
 
-    return { type: 'turn', data: { currentPlayer: game.playersTurn } };
+    return { type: 'turn', data: { currentPlayer: game.playersTurn, gameId: game.playersTurn === BOT_ID ? gameId : undefined } };
 }
 
 export function isHitShip(ship: GameShip, position: TilePosition): boolean {
@@ -137,4 +142,21 @@ export function finishGame(indexPlayer: number): Finish {
     users.set(indexPlayer, { ...user, wins: user.wins + 1 });
 
     return { type: 'finish', data: { winPlayer: indexPlayer } }
+}
+
+export function singlePlay(userId: number): CreateGame {
+    const id = Date.now();
+
+    games.set(
+        id,
+        {
+            gameId: id,
+            players: [BOT_ID, userId],
+            ships: { [BOT_ID]: botShips.map(ship => ({ ...ship, hp: ship.length })) },
+            playersTurn: null
+        }
+    );
+
+
+    return { type: 'create_game', data: { idGame: id, idPlayer: userId } }
 }

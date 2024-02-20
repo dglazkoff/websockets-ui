@@ -46,6 +46,7 @@ export interface Turn extends SocketResponse {
     type: 'turn';
     data: {
         currentPlayer: User['index'];
+        gameId?: Game['gameId'];
     };
 }
 
@@ -64,6 +65,11 @@ export interface AttackRequest extends SocketRequest {
         gameId: Game['gameId'];
         indexPlayer: User['index'];
     };
+}
+
+export interface SinglePlay extends SocketRequest {
+    type: 'single_play';
+    data: "";
 }
 
 export interface AttackRandomRequest extends SocketRequest {

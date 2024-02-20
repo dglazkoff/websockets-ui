@@ -21,6 +21,12 @@ export function addShips(request: AddShipRequest) {
     })
 }
 
+export function getRandomPosition() {
+    return {
+        x: Math.round(getRandomArbitrary(0, 9)),
+        y: Math.round(getRandomArbitrary(0, 9)),
+    }
+}
 
 export function attack(request: AttackRequest) {
     const { gameId, indexPlayer, x, y } = request.data;
@@ -42,16 +48,12 @@ export function attack(request: AttackRequest) {
 }
 
 export function randomAttack(request: AttackRandomRequest) {
-    const x = Math.round(getRandomArbitrary(0, 9));
-    const y = Math.round(getRandomArbitrary(0, 9));
-
     return attack({
         type: 'attack',
         data: {
             gameId: request.data.gameId,
             indexPlayer: request.data.indexPlayer,
-            x,
-            y,
+            ...getRandomPosition(),
         }
     });
 }

@@ -2,9 +2,11 @@ import {WebSocket, WebSocketServer} from 'ws';
 import {RequestType, SocketMessage, SocketResponse} from "../types/api";
 import {registerUser, updateWinners, userDisconnect} from "../services/user";
 import {addUserToRoom, createRoom, getRoom, removeRoom, updateRooms} from "../services/room";
-import {createGame} from "../services/game";
+import {createGame, singlePlay} from "../services/game";
 import {addShips, attack, randomAttack} from "../controllers/game";
 import * as console from "console";
+import {BOT_ID} from "../botConstants";
+import {Turn} from "../types/game";
 
 interface ExtWebSocket extends WebSocket {
     userId: number;
@@ -47,6 +49,22 @@ export function createWebSocketServer(port: number) {
                     });
                 }
             });
+
+            const botResponse = socketResponses.find(response => response.id === BOT_ID);
+
+            if (botResponse) {
+                const turn = botResponse.responses.find(response => response.type === 'turn') as Turn | undefined;
+
+                if (turn && turn.data.currentPlayer === BOT_ID) {
+                    console.log('bot attack');
+                    const attackResponse = randomAttack({ type: 'randomAttack', data: { gameId: turn.data.gameId!, indexPlayer: BOT_ID } });
+
+                    if (attackResponse) {
+                        sendResponses(attackResponse);
+                    }
+
+                }
+            }
         }
 
         ws.on('message', function message(request) {
@@ -128,6 +146,12 @@ export function createWebSocketServer(port: number) {
 
                         break;
                     }
+
+                    case 'single_play': {
+                        send(singlePlay(ws.userId));
+
+                        break;
+                    }
                     default:
                         throw new Error('Unknown type');
                 }
@@ -137,10 +161,14 @@ export function createWebSocketServer(port: number) {
         });
 
         ws.on('close', function close() {
-            const socketResponses = userDisconnect(ws.userId);
+            try {
+                const socketResponses = userDisconnect(ws.userId);
 
-            if (socketResponses) {
-                sendResponses(socketResponses);
+                if (socketResponses) {
+                    sendResponses(socketResponses);
+                }
+            } catch (e) {
+                console.error(e);
             }
         });
     });
